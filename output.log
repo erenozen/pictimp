@@ -1,0 +1,30 @@
+Welcome to Pairwise-CLI!
+This tool uses Microsoft PICT to generate pairwise (2-way) combinatorial test suites.
+When strength=2, it can verify if the output achieves the theoretical minimum test count.
+------------------------------------------------------------
+
+Add parameters for your model.
+
+Parameter name (blank to finish): Traceback (most recent call last):
+  File "pairwise_cli/wizard.py", line 11, in prompt
+    return input(msg).strip()
+           ~~~~~^^^^^
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "__main__.py", line 5, in <module>
+  File "pairwise_cli/cli.py", line 104, in main
+    run_wizard()
+    ~~~~~~~~~~^^
+  File "pairwise_cli/wizard.py", line 27, in run_wizard
+    _gather_parameters(model)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "pairwise_cli/wizard.py", line 38, in _gather_parameters
+    pname = prompt("\nParameter name (blank to finish): ")
+  File "pairwise_cli/wizard.py", line 16, in prompt
+    print("\nAborted.")
+    ~~~~~^^^^^^^^^^^^^^
+KeyboardInterrupt
+[PYI-177331:ERROR] Failed to execute script '__main__' due to unhandled exception!
