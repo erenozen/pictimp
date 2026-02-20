@@ -10,6 +10,13 @@ readme = "README.md"
 requires-python = ">=3.8"
 dependencies = []
 
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pyinstaller",
+    "hypothesis"
+]
+
 [project.scripts]
 pairwise-cli = "pairwise_cli.cli:main"
 

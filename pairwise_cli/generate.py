@@ -38,9 +38,13 @@ def generate_suite(model: PairwiseModel,
                    strength: int = 2,
                    early_stop: bool = True,
                    verify: bool = True,
+                   require_verified: bool = True,
+                   pict_timeout_sec: float = 10.0,
+                   deterministic: bool = False,
                    verbose: bool = False) -> GenerationResult:
     """Runs PICT multiple times and returns the best generated suite."""
     if ordering_mode == OrderingMode.AUTO:
+        # Use stable sort built into get_reordered_parameters
         run_params = model.get_reordered_parameters()
     else:
         run_params = model.parameters
@@ -57,10 +61,17 @@ def generate_suite(model: PairwiseModel,
     best_passed = False
     best_missing = []
     
+    # Deterministic behavior overrides tries logic slightly if needed
+    # (By default base_seed+i loop is deterministic, but we explicitly enforce tie-breaks)
+    
     for i in range(tries):
         current_seed = base_seed + i
         try:
-            pict_out = run_pict(pict_model_str, strength=strength, seed=current_seed)
+            pict_out = run_pict(pict_model_str, strength=strength, seed=current_seed, timeout=pict_timeout_sec)
+        except TimeoutError as e:
+            if verbose:
+                print(f"PICT timeout on try {i+1}: {e}", file=sys.stderr)
+            continue
         except Exception as e:
             if verbose:
                 print(f"Error running generation on try {i+1}: {e}", file=sys.stderr)
@@ -74,18 +85,27 @@ def generate_suite(model: PairwiseModel,
         if verify and strength == 2:
             passed, missing = verify_pairwise_coverage(model, rows)
             
-        # We consider a suite "better" if:
-        # 1. It is the first one we've seen
-        # 2. It passed verification and previous best didn't
-        # 3. Both passed/failed equally, but this one has fewer rows
+        if require_verified and not passed:
+            if verbose:
+                print(f"  Attempt {i+1}/{tries} (seed {current_seed}): FAILED verification (missing {len(missing)} pairs)")
+            continue
+
         better = False
         if best_n == float('inf'):
             better = True
         elif passed and not best_passed:
             better = True
-        elif passed == best_passed and n < best_n:
-            better = True
-            
+        elif passed == best_passed:
+            # Deterministic tie-breaking:
+            if n < best_n:
+                better = True
+            elif n == best_n:
+                if deterministic:
+                    # Keep older seed to maintain stable identical selections 
+                    better = False
+                else:
+                    better = False # default to first encountered regardless
+
         if better:
             best_n = n
             best_rows = rows
@@ -106,7 +126,13 @@ def generate_suite(model: PairwiseModel,
                 )
                 
     if best_n == float('inf'):
-        raise RuntimeError("All generation attempts failed.")
+        if require_verified:
+            err = "All generation attempts failed either to execute or failed coverage verification."
+        else:
+            err = "All generation attempts failed to execute."
+        from . import EXIT_PICT_ERR
+        print(f"Error: {err}", file=sys.stderr)
+        sys.exit(EXIT_PICT_ERR)
         
     return GenerationResult(
         lb, best_n, best_seed, best_rows, best_passed, best_missing,

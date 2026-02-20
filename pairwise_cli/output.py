@@ -63,9 +63,18 @@ def format_csv(headers: List[str], rows: List[List[str]]) -> str:
     writer.writerows(rows)
     return f.getvalue()
 
-def format_json(headers: List[str], rows: List[List[str]]) -> str:
+def format_json(headers: List[str], rows: List[List[str]], metadata: Dict = None) -> str:
     result = []
     for row in rows:
         obj = {headers[i]: v for i, v in enumerate(row)}
         result.append(obj)
-    return json.dumps(result, indent=2)
+        
+    if metadata is not None:
+        payload = {
+            "metadata": metadata,
+            "test_cases": result
+        }
+    else:
+        payload = result
+        
+    return json.dumps(payload, indent=2)

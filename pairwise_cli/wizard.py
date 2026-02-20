@@ -58,12 +58,12 @@ def _gather_parameters(model: PairwiseModel):
                 else:
                     print("  Value already exists.")
                     
-        if len(vals) < 2:
-            print("Error: Parameter must have at least 2 values.")
+        try:
+            model.add_parameter(pname, vals)
+            print(f"Added parameter '{pname}' with {len(vals)} values.")
+        except ValueError as e:
+            print(f"Error: {e}")
             continue
-            
-        model.add_parameter(pname, vals)
-        print(f"Added parameter '{pname}' with {len(vals)} values.")
 
 def _print_summary(model: PairwiseModel):
     print("\nModel Summary:")
@@ -140,34 +140,68 @@ def _delete_parameter(model: PairwiseModel):
         print("Invalid number.")
 
 def _generate_and_present(model: PairwiseModel):
+    from . import EXIT_SUCCESS, EXIT_PICT_ERR, EXIT_VERIF_ERR, EXIT_TIMEOUT
+    
+    # Try validate limits first before bothering user
+    try:
+        model.validate_limits(max_params=50, max_values_per_param=50, max_total_values=500)
+    except ValueError as e:
+        print(f"\nModel Safety Violation: {e}")
+        print("To override limits, please use the non-interective CLI 'generate' command.")
+        return
+
     print("\nParameter ordering for generation:")
     print(" 1) Keep my order (as entered)")
     print(" 2) Auto-reorder (descending by #values) [Recommended]")
-    
     o_choice = prompt("Choice (1-2) [default 2]: ")
     ordering = OrderingMode.KEEP if o_choice == '1' else OrderingMode.AUTO
+    
+    t_choice = prompt("Number of tries to find smallest suite (default 50): ")
+    try:
+        tries = int(t_choice) if t_choice else 50
+    except ValueError:
+        print("Invalid number, defaulting to 50.")
+        tries = 50
+        
+    v_choice = prompt("Verify combinatorial pairwise coverage mathematically? (Y/n): ").lower()
+    verify = False if v_choice == 'n' else True
     
     print("\nGenerating...")
     try:
         res = generate_suite(
             model,
             ordering_mode=ordering,
-            tries=50,
+            tries=tries,
+            verify=verify,
+            require_verified=verify,
             verbose=True
         )
+    except TimeoutError as e:
+        print(f"Generation Timeout Error:\n{e}")
+        sys.exit(EXIT_TIMEOUT)
     except Exception as e:
         print(f"Error running generation:\n{e}")
-        sys.exit(1)
+        sys.exit(EXIT_PICT_ERR)
         
-    if not res.passed_verification:
+    if verify and not res.passed_verification:
         print("Error: Could not generate a test suite that satisfies pairwise coverage.")
         for p in res.missing_pairs[:20]:
             print(f" Missing pair: {p}")
-        sys.exit(1)
+        sys.exit(EXIT_VERIF_ERR)
     
-    print("-" * 60)
-    print(format_table(res.canonical_headers, res.rows))
-    print("-" * 60)
+    n = len(res.rows)
+    print_out = True
+    
+    if n > 100000:
+        print(f"\nWarning: Generated dataset contains {n} rows, exceeding stdout display limits!")
+        p_choice = prompt("Print to console anyway? (y/N): ").lower()
+        if p_choice != 'y':
+            print_out = False
+            
+    if print_out:
+        print("-" * 60)
+        print(format_table(res.canonical_headers, res.rows))
+        print("-" * 60)
     print(f"Parameter Counts   : {', '.join(str(c) for c in model.get_counts())}")
     
     if res.ordering_mode == OrderingMode.AUTO:

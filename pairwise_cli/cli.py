@@ -9,15 +9,44 @@ from .output import format_table, format_csv, format_json
 from .generate import generate_suite, OrderingMode
 
 def cmd_generate(args):
+    from . import EXIT_SUCCESS, EXIT_VALIDATION, EXIT_PICT_ERR, EXIT_VERIF_ERR, EXIT_TIMEOUT
+    
+    if args.dry_run:
+        print("Dry run requested.", file=sys.stderr)
+        
     if not os.path.exists(args.model):
-        print(f"File not found: {args.model}", file=sys.stderr)
-        sys.exit(1)
+        print(f"Error: File not found: {args.model}", file=sys.stderr)
+        sys.exit(EXIT_VALIDATION)
         
     with open(args.model, "r", encoding="utf-8") as f:
         content = f.read()
         
-    model = PairwiseModel.from_pict_model(content)
+    try:
+        model = PairwiseModel.from_pict_model(content)
+        model.validate_limits(
+            max_params=args.max_params,
+            max_values_per_param=args.max_values_per_param,
+            max_total_values=args.max_total_values
+        )
+    except ValueError as e:
+        print(f"Validation error: {e}", file=sys.stderr)
+        sys.exit(EXIT_VALIDATION)
+        
     ordering = OrderingMode.KEEP if args.keep_order else OrderingMode(args.ordering)
+    
+    if args.dry_run:
+        if ordering == OrderingMode.AUTO:
+            run_params = model.get_reordered_parameters()
+        else:
+            run_params = model.parameters
+        print("Model parsing valid.", file=sys.stderr)
+        print("Generating following internal PICT model:", file=sys.stderr)
+        print("-" * 40, file=sys.stderr)
+        print(model.to_pict_model(run_params).strip(), file=sys.stderr)
+        print("-" * 40, file=sys.stderr)
+        print(f"Would invoke tries: {args.tries}", file=sys.stderr)
+        print(f"Planned seed range: {args.seed} through {args.seed + args.tries - 1}", file=sys.stderr)
+        sys.exit(EXIT_SUCCESS)
     
     try:
         res = generate_suite(
@@ -28,35 +57,63 @@ def cmd_generate(args):
             strength=args.strength,
             early_stop=args.early_stop,
             verify=args.verify,
+            require_verified=args.require_verified,
+            pict_timeout_sec=args.pict_timeout_sec,
+            deterministic=args.deterministic,
             verbose=args.verbose
         )
+    except TimeoutError as e:
+        print(f"Generation timeout error: {e}", file=sys.stderr)
+        sys.exit(EXIT_TIMEOUT)
     except Exception as e:
         print(f"Generation error: {e}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_PICT_ERR)
         
-    if args.format == 'table':
-        out_str = format_table(res.canonical_headers, res.rows)
-    elif args.format == 'csv':
-        out_str = format_csv(res.canonical_headers, res.rows)
-    elif args.format == 'json':
-        out_str = format_json(res.canonical_headers, res.rows)
+    # Check verification bounds
+    if args.verify and args.strength == 2 and not res.passed_verification:
+        print("Error: Coverage verification failed.", file=sys.stderr)
+        for pair in res.missing_pairs[:20]:
+            print(f" Missing pair: {pair}", file=sys.stderr)
+        sys.exit(EXIT_VERIF_ERR)
         
+    # Formatting
+    n = len(res.rows)
+    print_output = True
+    
+    if not args.out and args.format != 'json' and n > args.max_output_cases and not args.print_all:
+        print(f"Warning: Generated {n} tests exceeding --max-output-cases limit of {args.max_output_cases}.", file=sys.stderr)
+        print("To see this output to console, pass --print-all or write to a file using --out FILE", file=sys.stderr)
+        print_output = False
+        
+    out_str = ""
+    if print_output or args.out:
+        if args.format == 'table':
+            out_str = format_table(res.canonical_headers, res.rows)
+        elif args.format == 'csv':
+            out_str = format_csv(res.canonical_headers, res.rows)
+        elif args.format == 'json':
+            metadata = {
+                "ordering_mode": res.ordering_mode.value,
+                "tries_attempted": res.attempts,
+                "best_seed": res.seed,
+                "lb": res.lb if args.strength == 2 else 0,
+                "n": n,
+                "verified": res.passed_verification
+            }
+            out_str = format_json(res.canonical_headers, res.rows, metadata=metadata)
+            
     if args.out:
         with open(args.out, "w", encoding="utf-8") as f:
             f.write(out_str)
             if args.format != 'json':
                 f.write('\n')
-    else:
+    elif print_output:
         print(out_str)
         
-    if args.verify and args.strength == 2:
-        if not res.passed_verification:
-            print("Error: Coverage verification failed.", file=sys.stderr)
-            for pair in res.missing_pairs[:20]:
-                print(f" Missing pair: {pair}", file=sys.stderr)
-            sys.exit(1)
+    sys.exit(EXIT_SUCCESS)
 
 def cmd_doctor(args):
+    from . import EXIT_SUCCESS, EXIT_PICT_ERR
     print("Pairwise-CLI Doctor")
     print("-" * 20)
     system, machine = get_platform_info()
@@ -69,14 +126,18 @@ def cmd_doctor(args):
         print(f"PICT Extracted To   : {path}")
         print("PICT Extract        : OK")
         
-        out = run_pict("a: A1, A2\nb: B1, B2\n", strength=2)
+        out = run_pict("a: A1, A2\nb: B1, B2\n", strength=2, timeout=5.0)
         if "A1" in out and "B1" in out:
             print("PICT Execution      : OK")
         else:
             print("PICT Execution      : UNEXPECTED OUTPUT")
+            sys.exit(EXIT_PICT_ERR)
     except Exception as e:
         print(f"Doctor Failed       : {e}")
-        sys.exit(1)
+        sys.exit(EXIT_PICT_ERR)
+        
+    print("Doctor checks passed successfully.")
+    sys.exit(EXIT_SUCCESS)
 
 def cmd_licenses(args):
     if hasattr(sys, "_MEIPASS"):
@@ -113,9 +174,20 @@ def main():
     gen_parser.add_argument("--seed", type=int, default=0, help="Base random seed (default: 0)")
     gen_parser.add_argument("--strength", type=int, default=2, help="Combinatorial strength (default: 2)")
     
+    # Limits and Boundaries
+    gen_parser.add_argument("--max-params", type=int, default=50, help="Maximum number of parameters allowed (default: 50)")
+    gen_parser.add_argument("--max-values-per-param", type=int, default=50, help="Maximum number of values per parameter allowed (default: 50)")
+    gen_parser.add_argument("--max-total-values", type=int, default=500, help="Maximum total sum of all values allowed (default: 500)")
+    gen_parser.add_argument("--max-output-cases", type=int, default=100000, help="Output block limit on table format prints (default: 100000)")
+    gen_parser.add_argument("--pict-timeout-sec", type=float, default=10.0, help="Subprocess timeout per PICT execution (default: 10.0s)")
+
     # Booleans
+    gen_parser.add_argument("--print-all", action="store_true", help="Force print table output even if exceeding max bounds")
+    gen_parser.add_argument("--dry-run", action="store_true", help="Parse the model, resolve parameters, and plan seeds but do not execute PICT")
+    gen_parser.add_argument("--deterministic", action="store_true", help="Force mathematically deterministic seed selection when output boundaries are identical between run ties")
     gen_parser.add_argument("--no-early-stop", action="store_false", dest="early_stop", help="Do not stop early if LB is reached")
     gen_parser.add_argument("--no-verify", action="store_false", dest="verify", help="Disable pair coverage verification")
+    gen_parser.add_argument("--no-require-verified", action="store_false", dest="require_verified", help="Do not drop generation attempts that fail coverage mathematically")
     gen_parser.add_argument("--verbose", action="store_true", help="Print detailed attempt logs")
     
     args = parser.parse_args()
