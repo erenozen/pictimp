@@ -15,7 +15,7 @@ Cross-platform CLI tool for generating **pairwise (2-way) combinatorial test sui
 No Python or separate PICT installation is required to run the executables.
 
 ## Demo Video
-[In this video]((https://drive.google.com/file/d/1GMQX0jZKarXRnUFS3gjtPqyHBvhkJ8lT/view?usp=drive_link) ) (around **1:40**), the first run produces a valid pairwise suite with **17 test cases** (matching the text book’s (Software Testing and Analysis: Process, Principles and Techniques, Wiley, ISBN 0471455938., Mauro Pezzè, Michal Young, 2008, Wiley) result). Then the tool continues trying different randomized PICT runs and finds a **16-case** suite.
+[In this video](https://drive.google.com/file/d/1GMQX0jZKarXRnUFS3gjtPqyHBvhkJ8lT/view?usp=drive_link), around **1:40**, the first run produces a valid pairwise suite with **17 test cases** (matching the text book’s (Software Testing and Analysis: Process, Principles and Techniques, Wiley, ISBN 0471455938., Mauro Pezzè, Michal Young, 2008, Wiley) result). Then the tool continues trying different randomized PICT runs and finds a **16-case** suite.
 
 Why it can stop at 16 (and why this is **provably minimum**): for pairwise testing, the minimum possible number of test cases is bounded below by the largest number of value-combinations among any single pair of parameters. In other words, if one parameter pair has `v_i × v_j = 16` combinations, then **no pairwise test suite can have fewer than 16 tests**, because each test can cover at most one combination for that specific parameter pair. Therefore, **16 is a mathematical lower bound**.
 
