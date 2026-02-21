@@ -1,91 +1,51 @@
-# Pairwise-CLI
+# PICT Improved
 
-A complete, cross-platform CLI application for generating pairwise (2-way) combinatorial test suites using Microsoft PICT.
+Cross-platform CLI tool for generating **pairwise (2-way) combinatorial test suites** using Microsoft PICT.
 
-## Overview
-Pairwise testing is a combinatorics-based method of software testing that, for each pair of input parameters, tests all possible discrete combinations of those parameters. This ensures that any bugs caused by the interaction of two parameters will be caught, drastically reducing the number of tests compared to exhaustive testing while maintaining high coverage.
+## What it does
+- Generates pairwise test cases from `.pict` models
+- Verifies pairwise coverage
+- Searches for smaller suites across multiple runs/seeds
+- Works as a **standalone executable** (PICT is bundled)
 
-## Pairwise Minimums
-A core feature of `pairwise-cli` is the computation of the theoretical pairwise **Lower Bound (LB)**.
-For an unordered pair of parameters i, j with value counts v_i, v_j, the number of possible pairs is v_i * v_j.
-The absolute minimum number of tests needed to cover ALL pairs in the model is the maximum of these products:
-`LB = max(v_i * v_j)` for all parameters i < j.
+## Executables
+- **Windows:** `pairwise-cli-win-x64.exe`
+- **Linux:** `pairwise-cli-linux-x64` (included in this repository)
 
-If the generated suite size `N` equals `LB`, we can definitively say the suite is **PROVABLY MINIMUM**.
+No Python or separate PICT installation is required to run the executables.
 
-To achieve this, `pairwise-cli` continuously runs PICT with different random seeds (up to 50 tries by default). If it finds a suite where `N == LB`, it stops early, guaranteeing the most mathematically optimal test suite possible.
+## [Demo Video](https://drive.google.com/file/d/1GMQX0jZKarXRnUFS3gjtPqyHBvhkJ8lT/view?usp=drive_link) 
+In this video (around **1:40**), the first run produces a valid pairwise suite with **17 test cases** (matching the text book’s (Software Testing and Analysis: Process, Principles and Techniques, Wiley, ISBN 0471455938., Mauro Pezzè, Michal Young, 2008, Wiley) result). Then the tool continues trying different randomized PICT runs and finds a **16-case** suite.
 
-It also automatically reorders parameters inside the PICT engine (largest domain first) without altering your output format, maximizing the collision rate of pairs to decrease test suite sizes.
+Why it can stop at 16 (and why this is **provably minimum**): for pairwise testing, the minimum possible number of test cases is bounded below by the largest number of value-combinations among any single pair of parameters. In other words, if one parameter pair has `v_i × v_j = 16` combinations, then **no pairwise test suite can have fewer than 16 tests**, because each test can cover at most one combination for that specific parameter pair. Therefore, **16 is a mathematical lower bound**.
 
-Finally, `pairwise-cli` strictly verifies mathematical coverage of all required pairwise combinations before outputting a test suite, ensuring absolute safety for mission-critical tests.
+Since the tool also verifies full pairwise coverage and successfully produces a suite with exactly **16** test cases, it has reached the lower bound. That means the result is **optimal (provably minimum)**, so further search cannot improve it.
 
-## Installation
-Just download the pre-compiled executable for your platform from the Releases page. No installation required. You do NOT need to install PICT!
-
-- `pairwise-cli-win-x64.exe`
-- `pairwise-cli-linux-x64`
-
-### Usage
-Run the wizard directly without arguments:
+## Quick Usage
 ```bash
+# Interactive wizard
 ./pairwise-cli-linux-x64
-```
-It will guide you through entering parameters interactively.
 
-Generate tests non-interactively from a `.pict` model file:
-```bash
+# Generate from model
 ./pairwise-cli-linux-x64 generate --model examples/sample.pict --format table
-```
-*Formats:* `table`, `csv`, `json`.
 
-*Optimization and Verification flags for `generate`:*
-- `--ordering {keep,auto}`: Choose parameter ordering (Default: `auto`). Reorders parameters descending by value count to generate smaller test suites while mapped output remains canonical.
-- `--tries N`: Best-of search iterations using randomized seeds to find the smallest possible valid test suite (Default: `50`).
-- `--max-tries N`: Upper bound for accepted `--tries` values (Default: `5000`).
-- `--early-stop` / `--no-early-stop`: Stop immediately if a mathematically minimum test suite `N == LB` is found (Default: True).
-- `--verify` / `--no-verify`: Statistically verify that every single valid 2-way pair is perfectly covered in the final output (Default: True).
-- `--seed N`: Start with a base random seed.
-- `--pict-timeout-sec S`: Timeout for each PICT subprocess call.
-- `--total-timeout-sec S`: Overall timeout budget across all tries.
+# Verify a generated suite
+./pairwise-cli-linux-x64 verify --model examples/sample.pict --cases cases.csv
+````
 
-Other commands:
-- `doctor`: Verifies bundled PICT extraction and system compatibility.
-- `version`: Prints the app version.
-- `licenses`: Prints open-source licenses.
+## Main Commands
 
-## Building from source
+* `generate`
+* `verify`
+* `doctor`
+* `version`
+* `licenses`
 
-### 1) Build vendor PICT
-This compiles PICT and places it into `vendor/pict/<arch>/`.
+## Repository Notes
 
-**Linux:**
-```bash
-./scripts/build_pict.sh
-```
-**Windows:**
-```powershell
-.\scripts\build_pict.ps1
-```
+The repository includes:
 
-### 2) Run Tests
-```bash
-pip install -e .[dev]
-pytest -v
-```
-
-### 3) Package Executable
-This bundles the PICT binary and python files into a single standalone executable.
-**Linux:**
-```bash
-./scripts/build_exe.sh
-```
-**Windows:**
-```powershell
-.\scripts\build_exe.ps1
-```
-## Verification / Evaluation
-
-Professor Verification Checklist: `docs/VERIFICATION_CHECKLIST.md`
-
-Robustness coverage includes adversarial wizard interactions (invalid state transitions, malformed input, and cancellation paths) to ensure no unhandled tracebacks during normal use.
-
+* source code
+* tests
+* build scripts
+* Linux and Windows executables 
