@@ -1,0 +1,2 @@
+[console_scripts]
+pairwise-cli = pairwise_cli.cli:main

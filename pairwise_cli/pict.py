@@ -119,6 +119,11 @@ def run_pict(model_content: str, strength: int = 2, seed: int = None, timeout: f
     Returns standard output.
     Raises TimeoutError if execution exceeds the timeout.
     """
+    # Extremely small timeouts are below practical process scheduling resolution
+    # on Windows and can behave non-deterministically. Treat them as immediate timeout.
+    if timeout is not None and timeout < 0.001:
+        raise TimeoutError(f"PICT executable timed out after {timeout} seconds executing the model.")
+
     pict_exe = extract_pict_if_needed()
     
     with tempfile.NamedTemporaryFile(mode='w', suffix='.pict', delete=False, encoding='utf-8') as f:

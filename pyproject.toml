@@ -20,6 +20,9 @@ dev = [
 [project.scripts]
 pairwise-cli = "pairwise_cli.cli:main"
 
+[tool.setuptools]
+packages = ["pairwise_cli"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
