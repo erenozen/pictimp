@@ -4,12 +4,20 @@ __pycache__/
 *.pyo
 *.egg-info/
 build/
+*.spec
 
 # Local virtual environments
 .venv/
 .venv-linux/
 
-# Local logs / debug artifacts (your current clutter pattern)
+# Tool caches
+.hypothesis/
+.pytest_cache/
+.pairwise-cli-cache/
+.vscode/
+
+# Local logs / debug artifacts
+build_out.txt
 out*.txt
 out*.json
 out_verbose.err
@@ -27,6 +35,7 @@ test_fuzz_out.txt
 tiny_timeout_*
 strace.out
 strace_python.txt
+dist/*.txt
 
 # Local scratch files
 empty.pict
