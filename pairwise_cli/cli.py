@@ -151,9 +151,10 @@ def cmd_generate(args):
             out_str = format_json(res.canonical_headers, res.rows, metadata=metadata)
             
     if args.out:
-        with open(args.out, "w", encoding="utf-8") as f:
+        newline = "" if args.format == "csv" else None
+        with open(args.out, "w", encoding="utf-8", newline=newline) as f:
             f.write(out_str)
-            if args.format != 'json':
+            if args.format not in ('json', 'csv'):
                 f.write('\n')
     elif print_output:
         print(out_str)
@@ -214,6 +215,9 @@ def cmd_verify(args):
     import csv
     import json
     
+    def _normalize_csv_header(header):
+        return str(header).lstrip("\ufeff").strip()
+    
     if not os.path.exists(args.model):
         print(f"Error: File not found: {args.model}", file=sys.stderr)
         sys.exit(EXIT_VALIDATION)
@@ -242,53 +246,72 @@ def cmd_verify(args):
     rows = []
     canonical_headers = [p.display_name for p in model.parameters]
     try:
-        with open(args.cases, "r", encoding="utf-8", newline="") as f:
-            if args.cases.endswith(".json"):
+        if args.cases.endswith(".json"):
+            with open(args.cases, "r", encoding="utf-8") as f:
                 try:
                     data = json.load(f)
                 except json.JSONDecodeError as e:
                     print(f"Validation error: Cases JSON is invalid: {e}", file=sys.stderr)
                     sys.exit(EXIT_VALIDATION)
 
-                # handle both {"metadata": ..., "test_cases": [...]} and [...]
-                if isinstance(data, dict) and "test_cases" in data:
-                    cases = data["test_cases"]
-                else:
-                    cases = data
-
-                if not isinstance(cases, list):
-                    print("Validation error: Cases JSON must be an array or contain a 'test_cases' array.", file=sys.stderr)
-                    sys.exit(EXIT_VALIDATION)
-                
-                for test_case in cases:
-                    if not isinstance(test_case, dict):
-                        print("Validation error: Each JSON case must be an object.", file=sys.stderr)
-                        sys.exit(EXIT_VALIDATION)
-                    row = []
-                    for h in canonical_headers:
-                        row.append(str(test_case.get(h, "")))
-                    rows.append(row)
+            # handle both {"metadata": ..., "test_cases": [...]} and [...]
+            if isinstance(data, dict) and "test_cases" in data:
+                cases = data["test_cases"]
             else:
-                # Assume CSV
-                try:
+                cases = data
+
+            if not isinstance(cases, list):
+                print("Validation error: Cases JSON must be an array or contain a 'test_cases' array.", file=sys.stderr)
+                sys.exit(EXIT_VALIDATION)
+            
+            for test_case in cases:
+                if not isinstance(test_case, dict):
+                    print("Validation error: Each JSON case must be an object.", file=sys.stderr)
+                    sys.exit(EXIT_VALIDATION)
+                row = []
+                for h in canonical_headers:
+                    row.append(str(test_case.get(h, "")))
+                rows.append(row)
+        else:
+            # Assume CSV
+            try:
+                with open(args.cases, "r", encoding="utf-8-sig", newline="") as f:
                     reader = csv.reader(f)
                     headers = next(reader, None)
                     if not headers:
                         print("Error: Cases file is empty", file=sys.stderr)
                         sys.exit(EXIT_VALIDATION)
                     
-                    header_idx = {h: i for i, h in enumerate(headers)}
+                    normalized_headers = [_normalize_csv_header(h) for h in headers]
+                    header_idx = {}
+                    for i, h in enumerate(normalized_headers):
+                        if h and h not in header_idx:
+                            header_idx[h] = i
+
+                    missing = [h for h in canonical_headers if h not in header_idx]
+                    if missing:
+                        print(
+                            "Validation error: missing required columns: " + ", ".join(missing),
+                            file=sys.stderr,
+                        )
+                        sys.exit(EXIT_VALIDATION)
+
                     for line in reader:
+                        if not line:
+                            continue
+                        if all((str(cell).strip() == "") for cell in line):
+                            continue
                         row = []
                         for h in canonical_headers:
-                            if h in header_idx and header_idx[h] < len(line):
-                                row.append(line[header_idx[h]])
+                            idx = header_idx[h]
+                            if idx < len(line):
+                                row.append(line[idx])
                             else:
                                 row.append("")
                         rows.append(row)
-                except csv.Error as e:
-                    print(f"Validation error: Cases CSV is invalid: {e}", file=sys.stderr)
-                    sys.exit(EXIT_VALIDATION)
+            except csv.Error as e:
+                print(f"Validation error: Cases CSV is invalid: {e}", file=sys.stderr)
+                sys.exit(EXIT_VALIDATION)
     except UnicodeDecodeError:
         print(f"Validation error: Cases file is not valid UTF-8 text: {args.cases}", file=sys.stderr)
         sys.exit(EXIT_VALIDATION)
@@ -297,7 +320,11 @@ def cmd_verify(args):
         sys.exit(EXIT_VALIDATION)
                 
     from .verify import verify_pairwise_coverage
-    passed, missing = verify_pairwise_coverage(model, rows)
+    try:
+        passed, missing = verify_pairwise_coverage(model, rows)
+    except (ValueError, TypeError, KeyError) as e:
+        print(f"Validation error: {e}", file=sys.stderr)
+        sys.exit(EXIT_VALIDATION)
     if not passed:
         print("Error: Coverage verification failed.", file=sys.stderr)
         for pair in missing[:20]:

@@ -70,6 +70,23 @@ def test_abuse_verify_empty_csv_no_traceback(cmd_target, tmp_path):
 
 
 @pytest.mark.acceptance
+def test_abuse_verify_missing_required_column_no_traceback(cmd_target, tmp_path):
+    missing_col_csv = tmp_path / "missing_column.csv"
+    with open(missing_col_csv, "w", encoding="utf-8", newline="") as f:
+        f.write("Language,Color,Display Mode,Fonts\r\n")
+        f.write("English,Monochrome,Text-only,Standard\r\n")
+
+    rc, stdout, stderr = run_cli_cmd(
+        cmd_target,
+        ["verify", "--model", str(MODEL_PATH), "--cases", str(missing_col_csv)],
+        timeout=15,
+    )
+    assert rc == 2
+    assert "missing required columns" in stderr
+    _assert_no_traceback(stdout, stderr)
+
+
+@pytest.mark.acceptance
 def test_abuse_generate_non_utf8_model_no_traceback(cmd_target, tmp_path):
     bad_model = tmp_path / "bad_model.pict"
     bad_model.write_bytes(b"\xff\xfe\xfa\xfb")
