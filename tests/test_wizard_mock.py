@@ -180,3 +180,17 @@ def test_run_wizard_repeat_flow_then_exit():
 
     assert gather_mock.call_count == 2
     assert menu_mock.call_count == 2
+
+
+def test_wizard_generate_requires_min_two_parameters():
+    model = PairwiseModel()
+
+    with patch("pairwise_cli.wizard.generate_suite") as gen_mock:
+        with patch("builtins.print") as print_mock:
+            _generate_and_present(model)
+
+    gen_mock.assert_not_called()
+    printed = "\n".join(
+        str(call.args[0]) for call in print_mock.call_args_list if call.args
+    )
+    assert "Input Error: You must define at least 2 parameters before generation." in printed

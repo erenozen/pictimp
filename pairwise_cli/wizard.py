@@ -152,7 +152,11 @@ def _delete_parameter(model: PairwiseModel):
 
 def _generate_and_present(model: PairwiseModel):
     from . import EXIT_SUCCESS, EXIT_PICT_ERR, EXIT_VERIF_ERR, EXIT_TIMEOUT
-    
+
+    if len(model.parameters) < 2:
+        print("\nInput Error: You must define at least 2 parameters before generation.")
+        return
+
     # Try validate limits first before bothering user
     try:
         model.validate_limits(max_params=50, max_values_per_param=50, max_total_values=500)
