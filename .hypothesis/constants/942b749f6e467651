@@ -1,0 +1,4 @@
+# file: C:\Users\ereno\Documents\GitHub\pictimp\pairwise_cli\util.py
+# hypothesis_version: 6.151.9
+
+['P', '[^A-Za-z0-9_]', '\\s+', '_']

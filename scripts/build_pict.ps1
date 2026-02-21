@@ -22,9 +22,16 @@ if (!(Test-Path $TargetDir)) {
     New-Item -ItemType Directory -Force -Path $TargetDir | Out-Null
 }
 
-$PictExe = "third_party\pict-src\build\Release\pict.exe"
-if (!(Test-Path $PictExe)) {
-    $PictExe = "third_party\pict-src\build\pict.exe"
+$PictExeCandidates = @(
+    "third_party\pict-src\build\Release\pict.exe",
+    "third_party\pict-src\build\cli\Release\pict.exe",
+    "third_party\pict-src\build\pict.exe"
+)
+
+$PictExe = $PictExeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $PictExe) {
+    Write-Error "Could not find built pict.exe. Tried:`n$($PictExeCandidates -join "`n")"
+    exit 1
 }
 
 Copy-Item -Path $PictExe -Destination "$TargetDir\pict.exe" -Force
