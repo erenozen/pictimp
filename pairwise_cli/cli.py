@@ -158,6 +158,74 @@ def cmd_licenses(args):
     print("THIRD_PARTY_NOTICES.txt not found.", file=sys.stderr)
     sys.exit(1)
 
+def cmd_verify(args):
+    from . import EXIT_SUCCESS, EXIT_VALIDATION, EXIT_VERIF_ERR
+    import csv
+    import json
+    
+    if not os.path.exists(args.model):
+        print(f"Error: File not found: {args.model}", file=sys.stderr)
+        sys.exit(EXIT_VALIDATION)
+        
+    if not os.path.exists(args.cases):
+        print(f"Error: File not found: {args.cases}", file=sys.stderr)
+        sys.exit(EXIT_VALIDATION)
+        
+    with open(args.model, "r", encoding="utf-8") as f:
+        content = f.read()
+        
+    try:
+        model = PairwiseModel.from_pict_model(content)
+    except ValueError as e:
+        print(f"Validation error: {e}", file=sys.stderr)
+        sys.exit(EXIT_VALIDATION)
+        
+    # parse cases
+    rows = []
+    canonical_headers = [p.display_name for p in model.parameters]
+    with open(args.cases, "r", encoding="utf-8") as f:
+        if args.cases.endswith(".json"):
+            data = json.load(f)
+            # handle both {"metadata": ..., "test_cases": [...]} and [...]
+            if isinstance(data, dict) and "test_cases" in data:
+                cases = data["test_cases"]
+            else:
+                cases = data
+                
+            for test_case in cases:
+                row = []
+                for h in canonical_headers:
+                    row.append(str(test_case.get(h, "")))
+                rows.append(row)
+        else:
+            # Assume CSV
+            reader = csv.reader(f)
+            headers = next(reader, None)
+            if not headers:
+                print("Error: Cases file is empty", file=sys.stderr)
+                sys.exit(EXIT_VALIDATION)
+                
+            header_idx = {h: i for i, h in enumerate(headers)}
+            for line in reader:
+                row = []
+                for h in canonical_headers:
+                    if h in header_idx and header_idx[h] < len(line):
+                        row.append(line[header_idx[h]])
+                    else:
+                        row.append("")
+                rows.append(row)
+                
+    from .verify import verify_pairwise_coverage
+    passed, missing = verify_pairwise_coverage(model, rows)
+    if not passed:
+        print("Error: Coverage verification failed.", file=sys.stderr)
+        for pair in missing[:20]:
+            print(f" Missing pair: {pair}", file=sys.stderr)
+        sys.exit(EXIT_VERIF_ERR)
+        
+    print("Coverage verified successfully.", file=sys.stderr)
+    sys.exit(EXIT_SUCCESS)
+
 def main():
     parser = argparse.ArgumentParser(description="Pairwise-CLI: Combinatorial test generator using Microsoft PICT.")
     subparsers = parser.add_subparsers(dest="command")
@@ -190,6 +258,14 @@ def main():
     gen_parser.add_argument("--no-require-verified", action="store_false", dest="require_verified", help="Do not drop generation attempts that fail coverage mathematically")
     gen_parser.add_argument("--verbose", action="store_true", help="Print detailed attempt logs")
     
+    ver_parser = subparsers.add_parser("verify", help="Verify coverage of a generated suite")
+    ver_parser.add_argument("--model", required=True, help="Path to the PICT model file")
+    ver_parser.add_argument("--cases", required=True, help="Path to the cases file (CSV or JSON)")
+    
+    doc_parser = subparsers.add_parser("doctor", help="Run self-diagnostics on the PICT integration")
+    lic_parser = subparsers.add_parser("licenses", help="Display third-party licenses")
+    version_parser = subparsers.add_parser("version", help="Print version information")
+    
     args = parser.parse_args()
     
     if args.command is None or args.command == "wizard":
@@ -198,6 +274,8 @@ def main():
         cmd_generate(args)
     elif args.command == "doctor":
         cmd_doctor(args)
+    elif args.command == "verify":
+        cmd_verify(args)
     elif args.command == "version":
         print("pairwise-cli 1.0.0")
     elif args.command == "licenses":

@@ -22,3 +22,6 @@ pairwise-cli = "pairwise_cli.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "acceptance: Acceptance tests"
+]

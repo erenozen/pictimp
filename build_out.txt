@@ -1,0 +1,34 @@
+++ uname -s
+++ tr '[:upper:]' '[:lower:]'
++ SYSTEM=linux
+++ uname -m
+++ tr '[:upper:]' '[:lower:]'
++ MACHINE=x86_64
++ '[' linux = linux ']'
++ TARGET=linux-x64
++ echo 'Building PyInstaller executable for linux-x64...'
+Building PyInstaller executable for linux-x64...
++ pyinstaller --noconfirm --onefile --console --name pairwise-cli-linux-x64 --add-data 'vendor/pict/linux-x64/*:vendor/pict/linux-x64' --add-data THIRD_PARTY_NOTICES.txt:. pairwise_cli/__main__.py
+114 INFO: PyInstaller: 6.19.0, contrib hooks: 2026.1
+115 INFO: Python: 3.14.2
+117 INFO: Platform: Linux-6.18.10-200.fc43.x86_64-x86_64-with-glibc2.42
+118 INFO: Python environment: /usr
+118 INFO: wrote /home/eren/pictimp/pairwise-cli-linux-x64.spec
+121 INFO: Module search paths (PYTHONPATH):
+['/usr/lib64/python314.zip',
+ '/usr/lib64/python3.14',
+ '/usr/lib64/python3.14/lib-dynload',
+ '/home/eren/.local/lib/python3.14/site-packages',
+ '/usr/lib64/python3.14/site-packages',
+ '/usr/lib/python3.14/site-packages',
+ '/home/eren/pictimp']
+109 WARNING: discover_hook_directories: Failed to process hook entry point 'EntryPoint(name='hook-dirs', value='rapidfuzz.__pyinstaller:get_hook_dirs', group='pyinstaller40')': AttributeError: module 'rapidfuzz.__pyinstaller' has no attribute 'get_hook_dirs'
+499 INFO: Appending 'datas' from .spec
+500 INFO: checking Analysis
+516 INFO: checking PYZ
+530 INFO: checking PKG
+532 INFO: Bootloader /home/eren/.local/lib/python3.14/site-packages/PyInstaller/bootloader/Linux-64bit-intel/run
+532 INFO: checking EXE
+533 INFO: Build complete! The results are available in: /home/eren/pictimp/dist
++ echo 'Done! Executable is in dist/'
+Done! Executable is in dist/
