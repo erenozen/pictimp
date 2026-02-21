@@ -2,16 +2,13 @@
 set -ex
 
 SYSTEM="$(uname -s | tr '[:upper:]' '[:lower:]')"
-MACHINE="$(uname -m | tr '[:upper:]' '[:lower:]')"
 
 if [ "$SYSTEM" = "linux" ]; then
   TARGET="linux-x64"
-elif [ "$SYSTEM" = "darwin" ]; then
-  if [ "$MACHINE" = "arm64" ] || [ "$MACHINE" = "aarch64" ]; then
-    TARGET="macos-arm64"
-  else
-    TARGET="macos-x64"
-  fi
+else
+  echo "Unsupported system for this script: $SYSTEM"
+  echo "This script supports Linux x64 builds only."
+  exit 1
 fi
 
 echo "Building PyInstaller executable for $TARGET..."

@@ -26,7 +26,7 @@ def test_acceptance_determinism(cmd_target):
     args = [
         "generate", "--model", str(MODEL_PATH), "--ordering", "auto", 
         "--strength", "2", "--tries", "40", "--seed", "123", 
-        "--deterministic", "--format", "json"
+        "--verify", "--early-stop", "--deterministic", "--format", "json"
     ]
     rc1, stdout1, stderr1 = run_cli_cmd(cmd_target, args, timeout=15)
     assert_successful_exit(rc1, stderr1)

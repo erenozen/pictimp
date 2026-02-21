@@ -7,6 +7,9 @@ import tempfile
 import subprocess
 from typing import Tuple
 
+class UnsupportedPlatformError(RuntimeError):
+    """Raised when current platform is outside the supported target matrix."""
+
 def get_platform_info() -> Tuple[str, str]:
     """Returns a tuple of (os_type, arch_type)."""
     return platform.system().lower(), platform.machine().lower()
@@ -16,15 +19,11 @@ def get_vendor_target() -> str:
     
     if system == "windows":
         return "win-x64"
-    elif system == "linux":
+    if system == "linux":
         return "linux-x64"
-    elif system == "darwin":
-        if "arm" in machine or "aarch64" in machine:
-            return "macos-arm64"
-        else:
-            return "macos-x64"
-    else:
-        raise RuntimeError(f"Unsupported system architecture: {system} {machine}")
+    raise UnsupportedPlatformError(
+        f"Unsupported platform: {system} {machine}. Supported targets are Windows x64 and Linux x64."
+    )
 
 def get_bundled_pict_path() -> str:
     """Returns the bundled source path for the platform's PICT executable."""
@@ -55,8 +54,6 @@ def get_extracted_pict_path() -> str:
         if system == "windows":
             os_cache = os.environ.get("LOCALAPPDATA", os.path.expanduser("~\\AppData\\Local"))
             base_dir = os.path.join(os_cache, "pairwise-cli")
-        elif system == "darwin":
-            base_dir = os.path.expanduser("~/Library/Caches/pairwise-cli")
         else:
             xdg_cache = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
             base_dir = os.path.join(xdg_cache, "pairwise-cli")
@@ -88,7 +85,10 @@ def extract_pict_if_needed() -> str:
     
     if not os.path.exists(source_path):
         target = get_vendor_target()
-        raise FileNotFoundError(f"Bundled PICT binary not found for {target} at '{source_path}'.\nHave you built the vendor binaries? Try running `make build-pict-linux` (or macos/win equivalent).")
+        raise FileNotFoundError(
+            f"Bundled PICT binary not found for {target} at '{source_path}'.\n"
+            "Have you built the vendor binaries? Try running `make build-pict-linux` (or Windows equivalent)."
+        )
         
     dest_path = get_extracted_pict_path()
         

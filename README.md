@@ -24,8 +24,6 @@ Just download the pre-compiled executable for your platform from the Releases pa
 
 - `pairwise-cli-win-x64.exe`
 - `pairwise-cli-linux-x64`
-- `pairwise-cli-macos-x64`
-- `pairwise-cli-macos-arm64`
 
 ### Usage
 Run the wizard directly without arguments:
@@ -43,9 +41,12 @@ Generate tests non-interactively from a `.pict` model file:
 *Optimization and Verification flags for `generate`:*
 - `--ordering {keep,auto}`: Choose parameter ordering (Default: `auto`). Reorders parameters descending by value count to generate smaller test suites while mapped output remains canonical.
 - `--tries N`: Best-of search iterations using randomized seeds to find the smallest possible valid test suite (Default: `50`).
+- `--max-tries N`: Upper bound for accepted `--tries` values (Default: `5000`).
 - `--early-stop` / `--no-early-stop`: Stop immediately if a mathematically minimum test suite `N == LB` is found (Default: True).
 - `--verify` / `--no-verify`: Statistically verify that every single valid 2-way pair is perfectly covered in the final output (Default: True).
 - `--seed N`: Start with a base random seed.
+- `--pict-timeout-sec S`: Timeout for each PICT subprocess call.
+- `--total-timeout-sec S`: Overall timeout budget across all tries.
 
 Other commands:
 - `doctor`: Verifies bundled PICT extraction and system compatibility.
@@ -57,7 +58,7 @@ Other commands:
 ### 1) Build vendor PICT
 This compiles PICT and places it into `vendor/pict/<arch>/`.
 
-**Linux / macOS:**
+**Linux:**
 ```bash
 ./scripts/build_pict.sh
 ```
@@ -74,7 +75,7 @@ pytest -v
 
 ### 3) Package Executable
 This bundles the PICT binary and python files into a single standalone executable.
-**Linux / macOS:**
+**Linux:**
 ```bash
 ./scripts/build_exe.sh
 ```

@@ -4,13 +4,49 @@ import argparse
 import os
 from .wizard import run_wizard
 from .model import PairwiseModel
-from .pict import run_pict, extract_pict_if_needed, get_platform_info, get_vendor_target
+from .pict import (
+    run_pict,
+    extract_pict_if_needed,
+    get_platform_info,
+    get_vendor_target,
+    UnsupportedPlatformError,
+)
 from .output import format_table, format_csv, format_json
-from .generate import generate_suite, OrderingMode
+from .generate import (
+    generate_suite,
+    OrderingMode,
+    GenerationVerificationError,
+    GenerationExecutionError,
+)
 
 def cmd_generate(args):
     from . import EXIT_SUCCESS, EXIT_VALIDATION, EXIT_PICT_ERR, EXIT_VERIF_ERR, EXIT_TIMEOUT
     
+    if args.tries < 1 or args.tries > args.max_tries:
+        print(
+            f"Validation error: --tries must be between 1 and {args.max_tries} (got {args.tries}).",
+            file=sys.stderr
+        )
+        sys.exit(EXIT_VALIDATION)
+
+    if args.strength < 2:
+        print("Validation error: --strength must be >= 2.", file=sys.stderr)
+        sys.exit(EXIT_VALIDATION)
+
+    if args.pict_timeout_sec <= 0:
+        print("Validation error: --pict-timeout-sec must be > 0.", file=sys.stderr)
+        sys.exit(EXIT_VALIDATION)
+
+    if args.total_timeout_sec <= 0:
+        print("Validation error: --total-timeout-sec must be > 0.", file=sys.stderr)
+        sys.exit(EXIT_VALIDATION)
+
+    if args.total_timeout_sec < args.pict_timeout_sec:
+        print(
+            "Warning: --total-timeout-sec is lower than --pict-timeout-sec; both limits will be enforced.",
+            file=sys.stderr
+        )
+
     if args.dry_run:
         print("Dry run requested.", file=sys.stderr)
         
@@ -59,22 +95,27 @@ def cmd_generate(args):
             verify=args.verify,
             require_verified=args.require_verified,
             pict_timeout_sec=args.pict_timeout_sec,
+            total_timeout_sec=args.total_timeout_sec,
             deterministic=args.deterministic,
             verbose=args.verbose
         )
+    except UnsupportedPlatformError as e:
+        print(f"Validation error: {e}", file=sys.stderr)
+        sys.exit(EXIT_VALIDATION)
     except TimeoutError as e:
         print(f"Generation timeout error: {e}", file=sys.stderr)
         sys.exit(EXIT_TIMEOUT)
+    except GenerationVerificationError as e:
+        print("Error: Coverage verification failed.", file=sys.stderr)
+        for pair in e.missing_pairs[:20]:
+            print(f" Missing pair: {pair}", file=sys.stderr)
+        sys.exit(EXIT_VERIF_ERR)
+    except GenerationExecutionError as e:
+        print(f"Generation error: {e}", file=sys.stderr)
+        sys.exit(EXIT_PICT_ERR)
     except Exception as e:
         print(f"Generation error: {e}", file=sys.stderr)
         sys.exit(EXIT_PICT_ERR)
-        
-    # Check verification bounds
-    if args.verify and args.strength == 2 and not res.passed_verification:
-        print("Error: Coverage verification failed.", file=sys.stderr)
-        for pair in res.missing_pairs[:20]:
-            print(f" Missing pair: {pair}", file=sys.stderr)
-        sys.exit(EXIT_VERIF_ERR)
         
     # Formatting
     n = len(res.rows)
@@ -96,7 +137,7 @@ def cmd_generate(args):
                 "ordering_mode": res.ordering_mode.value,
                 "tries_attempted": res.attempts,
                 "best_seed": res.seed,
-                "lb": res.lb if args.strength == 2 else 0,
+                "lb": res.lb,
                 "n": n,
                 "verified": res.passed_verification
             }
@@ -113,15 +154,15 @@ def cmd_generate(args):
     sys.exit(EXIT_SUCCESS)
 
 def cmd_doctor(args):
-    from . import EXIT_SUCCESS, EXIT_PICT_ERR
+    from . import EXIT_SUCCESS, EXIT_PICT_ERR, EXIT_VALIDATION
     print("Pairwise-CLI Doctor")
     print("-" * 20)
-    system, machine = get_platform_info()
-    target = get_vendor_target()
-    print(f"Detected Platform   : {system} {machine}")
-    print(f"Vendor Target       : {target}")
-    
     try:
+        system, machine = get_platform_info()
+        target = get_vendor_target()
+        print(f"Detected Platform   : {system} {machine}")
+        print(f"Vendor Target       : {target}")
+
         path = extract_pict_if_needed()
         print(f"PICT Extracted To   : {path}")
         print("PICT Extract        : OK")
@@ -132,6 +173,9 @@ def cmd_doctor(args):
         else:
             print("PICT Execution      : UNEXPECTED OUTPUT")
             sys.exit(EXIT_PICT_ERR)
+    except UnsupportedPlatformError as e:
+        print(f"Doctor Failed       : {e}")
+        sys.exit(EXIT_VALIDATION)
     except Exception as e:
         print(f"Doctor Failed       : {e}")
         sys.exit(EXIT_PICT_ERR)
@@ -253,10 +297,15 @@ def main():
     gen_parser.add_argument("--print-all", action="store_true", help="Force print table output even if exceeding max bounds")
     gen_parser.add_argument("--dry-run", action="store_true", help="Parse the model, resolve parameters, and plan seeds but do not execute PICT")
     gen_parser.add_argument("--deterministic", action="store_true", help="Force mathematically deterministic seed selection when output boundaries are identical between run ties")
+    gen_parser.add_argument("--early-stop", action="store_true", dest="early_stop", help="Stop early if LB is reached with verified coverage (default)")
     gen_parser.add_argument("--no-early-stop", action="store_false", dest="early_stop", help="Do not stop early if LB is reached")
+    gen_parser.add_argument("--verify", action="store_true", dest="verify", help="Enable pair coverage verification (default)")
     gen_parser.add_argument("--no-verify", action="store_false", dest="verify", help="Disable pair coverage verification")
     gen_parser.add_argument("--no-require-verified", action="store_false", dest="require_verified", help="Do not drop generation attempts that fail coverage mathematically")
+    gen_parser.add_argument("--total-timeout-sec", type=float, default=30.0, help="Overall timeout across all tries (default: 30.0s)")
+    gen_parser.add_argument("--max-tries", type=int, default=5000, help="Maximum allowed tries value (default: 5000)")
     gen_parser.add_argument("--verbose", action="store_true", help="Print detailed attempt logs")
+    gen_parser.set_defaults(early_stop=True, verify=True, require_verified=True)
     
     ver_parser = subparsers.add_parser("verify", help="Verify coverage of a generated suite")
     ver_parser.add_argument("--model", required=True, help="Path to the PICT model file")

@@ -3,7 +3,7 @@ import os
 import sys
 from .model import PairwiseModel
 from .output import format_table, format_csv
-from .generate import generate_suite, OrderingMode
+from .generate import generate_suite, OrderingMode, GenerationVerificationError
 
 def prompt(msg: str) -> str:
     try:
@@ -179,16 +179,15 @@ def _generate_and_present(model: PairwiseModel):
     except TimeoutError as e:
         print(f"Generation Timeout Error:\n{e}")
         sys.exit(EXIT_TIMEOUT)
+    except GenerationVerificationError as e:
+        print("Error: Could not generate a test suite that satisfies pairwise coverage.")
+        for p in e.missing_pairs[:20]:
+            print(f" Missing pair: {p}")
+        sys.exit(EXIT_VERIF_ERR)
     except Exception as e:
         print(f"Error running generation:\n{e}")
         sys.exit(EXIT_PICT_ERR)
         
-    if verify and not res.passed_verification:
-        print("Error: Could not generate a test suite that satisfies pairwise coverage.")
-        for p in res.missing_pairs[:20]:
-            print(f" Missing pair: {p}")
-        sys.exit(EXIT_VERIF_ERR)
-    
     n = len(res.rows)
     print_out = True
     
@@ -209,17 +208,22 @@ def _generate_and_present(model: PairwiseModel):
         print(f"Internal Reorder   : {', '.join(p.display_name for p in res.reordered_params)}")
     else:
         print(f"Ordering Mode      : Keep")
-        print(f"Internal Reorder   : (Matches original)")
+    print(f"Internal Reorder   : (Matches original)")
         
     print(f"Attempts Tried     : {res.attempts}")
     print(f"Best Seed Used     : {res.seed}")
-    print(f"Lower Bound (LB)   : {res.lb}")
+    if res.lb is not None:
+        print(f"Lower Bound (LB)   : {res.lb}")
+    else:
+        print("Lower Bound (LB)   : N/A")
     print(f"Generated Size (N) : {res.n}")
     
-    if res.n == res.lb:
+    if res.lb is not None and res.passed_verification and res.n == res.lb:
         print("Result: PROVABLY MINIMUM")
+    elif res.passed_verification:
+        print("Result: COVERAGE VERIFIED (NOT MINIMUM)")
     else:
-        print("Result: COVERAGE VERIFIED")
+        print("Result: COVERAGE NOT VERIFIED")
         
     print("-" * 60)
     

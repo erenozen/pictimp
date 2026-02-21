@@ -26,7 +26,7 @@ def test_acceptance_generate_auto(cmd_target):
     args = [
         "generate", "--model", str(MODEL_PATH), "--ordering", "auto", 
         "--strength", "2", "--tries", "40", "--seed", "0", 
-        "--deterministic", "--format", "json"
+        "--verify", "--early-stop", "--deterministic", "--format", "json"
     ]
     rc, stdout, stderr = run_cli_cmd(cmd_target, args, timeout=15)
     assert_successful_exit(rc, stderr)
@@ -44,7 +44,7 @@ def test_acceptance_generate_keep(cmd_target):
     args = [
         "generate", "--model", str(MODEL_PATH), "--ordering", "keep", 
         "--strength", "2", "--tries", "40", "--seed", "0", 
-        "--deterministic", "--format", "json"
+        "--verify", "--early-stop", "--deterministic", "--format", "json"
     ]
     rc, stdout, stderr = run_cli_cmd(cmd_target, args, timeout=15)
     assert_successful_exit(rc, stderr)

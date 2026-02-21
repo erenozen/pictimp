@@ -2,7 +2,12 @@
 import pytest
 from unittest.mock import patch
 from pairwise_cli.model import PairwiseModel
-from pairwise_cli.generate import generate_suite, OrderingMode, GenerationResult
+from pairwise_cli.generate import (
+    generate_suite,
+    OrderingMode,
+    GenerationResult,
+    GenerationVerificationError,
+)
 
 def build_dummy_model():
     m = PairwiseModel()
@@ -76,10 +81,9 @@ def test_require_verified_drops_unverified():
         with patch('pairwise_cli.generate.PictOutputParser.parse_tsv', side_effect=mock_parse_tsv):
             with patch('pairwise_cli.generate.verify_pairwise_coverage', side_effect=mock_verify):
                 
-                # If require_verified=True, it will throw SystemExit since none pass
-                with pytest.raises(SystemExit) as e:
+                # If require_verified=True, no verified suite should raise verification error.
+                with pytest.raises(GenerationVerificationError):
                     generate_suite(model, tries=2, require_verified=True)
-                assert e.value.code == 3 # EXIT_PICT_ERR
                 
                 # If require_verified=False, it should return the best one anyway
                 res = generate_suite(model, tries=2, require_verified=False)

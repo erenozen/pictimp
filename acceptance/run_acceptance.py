@@ -12,18 +12,11 @@ from acceptance.expectations import run_cli_cmd, assert_successful_exit, parse_j
 def get_executable_path():
     """Detect platform and find the proper built executable in dist/."""
     system = platform.system().lower()
-    machine = platform.machine().lower()
     
-    # Map to vendor targets (similar to pict.py logic)
     if system == "windows":
         filename = "pairwise-cli-win-x64.exe"
     elif system == "linux":
         filename = "pairwise-cli-linux-x64"
-    elif system == "darwin":
-        if machine == "arm64":
-            filename = "pairwise-cli-macos-arm64"
-        else:
-            filename = "pairwise-cli-macos-x64"
     else:
         return None
         
@@ -77,7 +70,7 @@ def test_generate_auto(cmd_target, timeout, model_path):
     args = [
         "generate", "--model", str(model_path), "--ordering", "auto", 
         "--strength", "2", "--tries", "40", "--seed", "0", 
-        "--deterministic", "--format", "json"
+        "--verify", "--early-stop", "--deterministic", "--format", "json"
     ]
     rc, stdout, stderr = run_cli_cmd(cmd_target, args, timeout=timeout)
     assert_successful_exit(rc, stderr)
@@ -94,7 +87,7 @@ def test_generate_keep(cmd_target, timeout, model_path):
     args = [
         "generate", "--model", str(model_path), "--ordering", "keep", 
         "--strength", "2", "--tries", "40", "--seed", "0", 
-        "--deterministic", "--format", "json"
+        "--verify", "--early-stop", "--deterministic", "--format", "json"
     ]
     rc, stdout, stderr = run_cli_cmd(cmd_target, args, timeout=timeout)
     assert_successful_exit(rc, stderr)
@@ -111,7 +104,7 @@ def test_determinism(cmd_target, timeout, model_path):
     args = [
         "generate", "--model", str(model_path), "--ordering", "auto", 
         "--strength", "2", "--tries", "40", "--seed", "123", 
-        "--deterministic", "--format", "json"
+        "--verify", "--early-stop", "--deterministic", "--format", "json"
     ]
     rc1, stdout1, stderr1 = run_cli_cmd(cmd_target, args, timeout=timeout)
     assert_successful_exit(rc1, stderr1)
