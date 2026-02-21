@@ -83,3 +83,7 @@ This bundles the PICT binary and python files into a single standalone executabl
 ```powershell
 .\scripts\build_exe.ps1
 ```
+## Verification / Evaluation
+
+Professor Verification Checklist: `docs/VERIFICATION_CHECKLIST.md`
+
