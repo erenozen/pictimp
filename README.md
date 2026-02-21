@@ -25,27 +25,4 @@ Since the tool also verifies full pairwise coverage and successfully produces a 
 ```bash
 # Interactive wizard
 ./pairwise-cli-linux-x64
-
-# Generate from model
-./pairwise-cli-linux-x64 generate --model examples/sample.pict --format table
-
-# Verify a generated suite
-./pairwise-cli-linux-x64 verify --model examples/sample.pict --cases cases.csv
 ````
-
-## Main Commands
-
-* `generate`
-* `verify`
-* `doctor`
-* `version`
-* `licenses`
-
-## Repository Notes
-
-The repository includes:
-
-* source code
-* tests
-* build scripts
-* Linux and Windows executables 
