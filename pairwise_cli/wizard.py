@@ -1,46 +1,67 @@
 """Interactive wizard flow."""
-import os
 import sys
 from .model import PairwiseModel
 from .output import format_table, format_csv
 from .generate import generate_suite, OrderingMode, GenerationVerificationError
+from .preflight import validate_generation_preflight
+
+
+class WizardCancelled(Exception):
+    """Raised when interactive input is cancelled by user."""
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
 
 def prompt(msg: str) -> str:
     try:
         return input(msg).strip()
-    except EOFError:
-        print()
-        sys.exit(0)
-    except KeyboardInterrupt:
-        print("\nAborted.")
-        sys.exit(0)
+    except EOFError as e:
+        raise WizardCancelled("eof") from e
+    except KeyboardInterrupt as e:
+        raise WizardCancelled("interrupt") from e
 
 def run_wizard():
-    print("Welcome to Pairwise-CLI!")
-    print("This tool uses Microsoft PICT to generate pairwise (2-way) combinatorial test suites.")
-    print("When strength=2, it can verify if the output achieves the theoretical minimum test count.")
-    print("You can exit anytime with Ctrl+C.")
-    print("Parameter: a configurable category being tested (example: Display Mode).")
-    print("Value: one option under a parameter (examples: full-graphics, text-only, limited-bandwith).")
-    print("-" * 60)
-    
-    while True:
-        model = PairwiseModel()
-        _gather_parameters(model)
+    try:
+        print("Welcome to Pairwise-CLI!")
+        print("This tool uses Microsoft PICT to generate pairwise (2-way) combinatorial test suites.")
+        print("When strength=2, it can verify if the output achieves the theoretical minimum test count.")
+        print("You can exit anytime with Ctrl+C.")
+        print("Parameter: a configurable category being tested (example: Display Mode).")
+        print("Value: one option under a parameter (examples: full-graphics, text-only, limited-bandwith).")
+        print("-" * 60)
         
-        if len(model.parameters) < 2:
-            print("Need at least 2 parameters for pairwise generation. Exiting.")
-            return
+        while True:
+            model = PairwiseModel()
+            _gather_parameters(model)
+            
+            if len(model.parameters) < 2:
+                print("Need at least 2 parameters for pairwise generation. Exiting.")
+                return
 
-        action = _menu_loop(model)
-        if action == "restart":
-            continue
-        if action == "generated":
-            again = prompt("\nWould you like to try another set of values? (y/N): ").lower()
-            if again == "y":
+            action = _menu_loop(model)
+            if action == "restart":
                 continue
+            if action == "generated":
+                again = prompt("\nWould you like to try another set of values? (y/N): ").lower()
+                if again == "y":
+                    continue
+                return
             return
+    except WizardCancelled as e:
+        if e.reason == "eof":
+            print("\nInput cancelled (EOF).")
+        else:
+            print("\nCancelled by user.")
         return
+
+
+def _parse_comma_values(values_input: str):
+    raw_parts = values_input.split(",")
+    if any(not part.strip() for part in raw_parts):
+        return None, "Malformed value list: values cannot be empty. Remove trailing or repeated commas."
+    values = [part.strip() for part in raw_parts]
+    return values, None
 
 def _gather_parameters(model: PairwiseModel):
     print("\nAdd parameters for your model.")
@@ -55,19 +76,23 @@ def _gather_parameters(model: PairwiseModel):
                 
         vals_input = prompt("Enter values comma-separated (or press Enter for one-by-one): ")
         if vals_input:
-            vals = [v.strip() for v in vals_input.split(',')]
-            vals = [v for v in vals if v]
-            vals = list(dict.fromkeys(vals))
+            vals, parse_error = _parse_comma_values(vals_input)
+            if parse_error:
+                print(f"Error: {parse_error}")
+                continue
         else:
             vals = []
+            seen = set()
             while True:
                 v = prompt(f"  Value {len(vals)+1} (blank to finish values): ")
                 if not v:
                     break
-                if v not in vals:
-                    vals.append(v)
-                else:
-                    print("  Value already exists.")
+                v_key = v.lower()
+                if v_key in seen:
+                    print("  Value already exists (case-insensitive).")
+                    continue
+                seen.add(v_key)
+                vals.append(v)
                     
         try:
             model.add_parameter(pname, vals)
@@ -93,8 +118,9 @@ def _menu_loop(model: PairwiseModel):
         
         choice = prompt("Choice (1-5): ")
         if choice == '1':
-            _generate_and_present(model)
-            return "generated"
+            if _generate_and_present(model):
+                return "generated"
+            continue
         elif choice == '2':
             _edit_parameter(model)
         elif choice == '3':
@@ -109,11 +135,12 @@ def _menu_loop(model: PairwiseModel):
 def _edit_parameter(model: PairwiseModel):
     idx_str = prompt("Parameter number to edit: ")
     try:
-        idx = int(idx_str) - 1
-        if idx < 0 or idx >= len(model.parameters):
+        idx = int(idx_str)
+        if idx <= 0 or idx > len(model.parameters):
             raise ValueError()
+        idx -= 1
     except ValueError:
-        print("Invalid number.")
+        print("Input Error: Invalid parameter number.")
         return
         
     p = model.parameters[idx]
@@ -125,45 +152,76 @@ def _edit_parameter(model: PairwiseModel):
     c = prompt("Choice: ")
     if c == '1':
         new_name = prompt("New name: ")
-        if new_name:
-            p.display_name = new_name
+        if not new_name:
+            print("Input Error: Parameter name cannot be empty.")
+            return
+        existing = {x.display_name.lower() for i, x in enumerate(model.parameters) if i != idx}
+        if new_name.lower() in existing:
+            print(f"Input Error: Duplicate parameter name detected: '{new_name}'.")
+            return
+        p.display_name = new_name
     elif c == '2':
         v = prompt("New value: ")
-        if v and v not in p.values:
-            p.values.append(v)
+        if not v:
+            print("Input Error: Value cannot be empty.")
+            return
+        if ',' in v or '\t' in v or '\n' in v:
+            print("Input Error: Value contains invalid characters (comma, tab, newline).")
+            return
+        existing_values = {x.lower() for x in p.values}
+        if v.lower() in existing_values:
+            print(f"Input Error: Duplicate value detected: '{v}'.")
+            return
+        p.values.append(v)
     elif c == '3':
         vals_input = prompt("Enter all values comma-separated: ")
         if vals_input:
-            vals = [v.strip() for v in vals_input.split(',')]
-            vals = [v for v in vals if v]
-            vals = list(dict.fromkeys(vals))
-            if len(vals) >= 2:
-                p.values = vals
-            else:
-                print("Need at least 2 values.")
+            vals, parse_error = _parse_comma_values(vals_input)
+            if parse_error:
+                print(f"Input Error: {parse_error}")
+                return
+            lower_vals = set()
+            for val in vals:
+                if ',' in val or '\t' in val or '\n' in val:
+                    print("Input Error: Value contains invalid characters (comma, tab, newline).")
+                    return
+                key = val.lower()
+                if key in lower_vals:
+                    print(f"Input Error: Duplicate value detected: '{val}'.")
+                    return
+                lower_vals.add(key)
+            if len(vals) < 2:
+                print("Input Error: Need at least 2 values.")
+                return
+            p.values = vals
+        else:
+            print("Input Error: Value list cannot be empty.")
+    else:
+        print("Input Error: Invalid edit choice.")
 
 def _delete_parameter(model: PairwiseModel):
     idx_str = prompt("Parameter number to delete: ")
     try:
-        idx = int(idx_str) - 1
+        idx = int(idx_str)
+        if idx <= 0 or idx > len(model.parameters):
+            raise ValueError()
+        idx -= 1
         model.parameters.pop(idx)
     except (ValueError, IndexError):
-        print("Invalid number.")
+        print("Input Error: Invalid parameter number.")
 
 def _generate_and_present(model: PairwiseModel):
-    from . import EXIT_SUCCESS, EXIT_PICT_ERR, EXIT_VERIF_ERR, EXIT_TIMEOUT
-
-    if len(model.parameters) < 2:
-        print("\nInput Error: You must define at least 2 parameters before generation.")
-        return
-
-    # Try validate limits first before bothering user
-    try:
-        model.validate_limits(max_params=50, max_values_per_param=50, max_total_values=500)
-    except ValueError as e:
-        print(f"\nModel Safety Violation: {e}")
-        print("To override limits, please use the non-interective CLI 'generate' command.")
-        return
+    preflight = validate_generation_preflight(
+        model,
+        max_params=50,
+        max_values_per_param=50,
+        max_total_values=500
+    )
+    if not preflight.ok:
+        print("\nInput Error:")
+        for issue in preflight.issues:
+            print(f" - {issue.message}")
+        return False
 
     print("\nParameter ordering for generation:")
     print(" 1) Keep my order (as entered)")
@@ -193,15 +251,15 @@ def _generate_and_present(model: PairwiseModel):
         )
     except TimeoutError as e:
         print(f"Generation Timeout Error:\n{e}")
-        sys.exit(EXIT_TIMEOUT)
+        return False
     except GenerationVerificationError as e:
         print("Error: Could not generate a test suite that satisfies pairwise coverage.")
         for p in e.missing_pairs[:20]:
             print(f" Missing pair: {p}")
-        sys.exit(EXIT_VERIF_ERR)
+        return False
     except Exception as e:
         print(f"Error running generation:\n{e}")
-        sys.exit(EXIT_PICT_ERR)
+        return False
         
     n = len(res.rows)
     print_out = True
@@ -247,17 +305,23 @@ def _generate_and_present(model: PairwiseModel):
         m_path = "pairwise_model.txt"
         m_reordered_path = "pairwise_model.reordered.txt"
         c_path = "pairwise_cases.txt"
-        
-        with open(m_path, "w", encoding="utf-8") as f:
-            for p in model.parameters:
-                f.write(f"{p.display_name}: {', '.join(p.values)}\n")
-                
-        if res.ordering_mode == OrderingMode.AUTO:
-            with open(m_reordered_path, "w", encoding="utf-8") as f:
-                f.write(res.internal_pict_model_str)
-            print(f"Saved: {m_path}, {m_reordered_path}, and {c_path}")
-        else:
-            print(f"Saved: {m_path} and {c_path}")
-                
-        with open(c_path, "w", encoding="utf-8") as f:
-            f.write(format_csv(res.canonical_headers, res.rows))
+
+        try:
+            with open(m_path, "w", encoding="utf-8") as f:
+                for p in model.parameters:
+                    f.write(f"{p.display_name}: {', '.join(p.values)}\n")
+
+            if res.ordering_mode == OrderingMode.AUTO:
+                with open(m_reordered_path, "w", encoding="utf-8") as f:
+                    f.write(res.internal_pict_model_str)
+                print(f"Saved: {m_path}, {m_reordered_path}, and {c_path}")
+            else:
+                print(f"Saved: {m_path} and {c_path}")
+
+            with open(c_path, "w", encoding="utf-8") as f:
+                f.write(format_csv(res.canonical_headers, res.rows))
+        except OSError as e:
+            print(f"Save Error: {e}")
+            return False
+
+    return True

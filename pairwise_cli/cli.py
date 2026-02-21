@@ -53,9 +53,16 @@ def cmd_generate(args):
     if not os.path.exists(args.model):
         print(f"Error: File not found: {args.model}", file=sys.stderr)
         sys.exit(EXIT_VALIDATION)
-        
-    with open(args.model, "r", encoding="utf-8") as f:
-        content = f.read()
+
+    try:
+        with open(args.model, "r", encoding="utf-8") as f:
+            content = f.read()
+    except UnicodeDecodeError:
+        print(f"Validation error: Model file is not valid UTF-8 text: {args.model}", file=sys.stderr)
+        sys.exit(EXIT_VALIDATION)
+    except OSError as e:
+        print(f"Validation error: Could not read model file: {e}", file=sys.stderr)
+        sys.exit(EXIT_VALIDATION)
         
     try:
         model = PairwiseModel.from_pict_model(content)
@@ -214,9 +221,16 @@ def cmd_verify(args):
     if not os.path.exists(args.cases):
         print(f"Error: File not found: {args.cases}", file=sys.stderr)
         sys.exit(EXIT_VALIDATION)
-        
-    with open(args.model, "r", encoding="utf-8") as f:
-        content = f.read()
+
+    try:
+        with open(args.model, "r", encoding="utf-8") as f:
+            content = f.read()
+    except UnicodeDecodeError:
+        print(f"Validation error: Model file is not valid UTF-8 text: {args.model}", file=sys.stderr)
+        sys.exit(EXIT_VALIDATION)
+    except OSError as e:
+        print(f"Validation error: Could not read model file: {e}", file=sys.stderr)
+        sys.exit(EXIT_VALIDATION)
         
     try:
         model = PairwiseModel.from_pict_model(content)
@@ -227,37 +241,60 @@ def cmd_verify(args):
     # parse cases
     rows = []
     canonical_headers = [p.display_name for p in model.parameters]
-    with open(args.cases, "r", encoding="utf-8") as f:
-        if args.cases.endswith(".json"):
-            data = json.load(f)
-            # handle both {"metadata": ..., "test_cases": [...]} and [...]
-            if isinstance(data, dict) and "test_cases" in data:
-                cases = data["test_cases"]
+    try:
+        with open(args.cases, "r", encoding="utf-8", newline="") as f:
+            if args.cases.endswith(".json"):
+                try:
+                    data = json.load(f)
+                except json.JSONDecodeError as e:
+                    print(f"Validation error: Cases JSON is invalid: {e}", file=sys.stderr)
+                    sys.exit(EXIT_VALIDATION)
+
+                # handle both {"metadata": ..., "test_cases": [...]} and [...]
+                if isinstance(data, dict) and "test_cases" in data:
+                    cases = data["test_cases"]
+                else:
+                    cases = data
+
+                if not isinstance(cases, list):
+                    print("Validation error: Cases JSON must be an array or contain a 'test_cases' array.", file=sys.stderr)
+                    sys.exit(EXIT_VALIDATION)
+                
+                for test_case in cases:
+                    if not isinstance(test_case, dict):
+                        print("Validation error: Each JSON case must be an object.", file=sys.stderr)
+                        sys.exit(EXIT_VALIDATION)
+                    row = []
+                    for h in canonical_headers:
+                        row.append(str(test_case.get(h, "")))
+                    rows.append(row)
             else:
-                cases = data
-                
-            for test_case in cases:
-                row = []
-                for h in canonical_headers:
-                    row.append(str(test_case.get(h, "")))
-                rows.append(row)
-        else:
-            # Assume CSV
-            reader = csv.reader(f)
-            headers = next(reader, None)
-            if not headers:
-                print("Error: Cases file is empty", file=sys.stderr)
-                sys.exit(EXIT_VALIDATION)
-                
-            header_idx = {h: i for i, h in enumerate(headers)}
-            for line in reader:
-                row = []
-                for h in canonical_headers:
-                    if h in header_idx and header_idx[h] < len(line):
-                        row.append(line[header_idx[h]])
-                    else:
-                        row.append("")
-                rows.append(row)
+                # Assume CSV
+                try:
+                    reader = csv.reader(f)
+                    headers = next(reader, None)
+                    if not headers:
+                        print("Error: Cases file is empty", file=sys.stderr)
+                        sys.exit(EXIT_VALIDATION)
+                    
+                    header_idx = {h: i for i, h in enumerate(headers)}
+                    for line in reader:
+                        row = []
+                        for h in canonical_headers:
+                            if h in header_idx and header_idx[h] < len(line):
+                                row.append(line[header_idx[h]])
+                            else:
+                                row.append("")
+                        rows.append(row)
+                except csv.Error as e:
+                    print(f"Validation error: Cases CSV is invalid: {e}", file=sys.stderr)
+                    sys.exit(EXIT_VALIDATION)
+    except UnicodeDecodeError:
+        print(f"Validation error: Cases file is not valid UTF-8 text: {args.cases}", file=sys.stderr)
+        sys.exit(EXIT_VALIDATION)
+    except OSError as e:
+        print(f"Validation error: Could not read cases file: {e}", file=sys.stderr)
+        sys.exit(EXIT_VALIDATION)
                 
     from .verify import verify_pairwise_coverage
     passed, missing = verify_pairwise_coverage(model, rows)
@@ -318,7 +355,15 @@ def main():
     args = parser.parse_args()
     
     if args.command is None or args.command == "wizard":
-        run_wizard()
+        from . import EXIT_PICT_ERR
+        try:
+            run_wizard()
+        except Exception as e:
+            print(f"Internal interactive error: {e}", file=sys.stderr)
+            if os.environ.get("PAIRWISECLI_DEBUG") == "1":
+                import traceback
+                traceback.print_exc()
+            sys.exit(EXIT_PICT_ERR)
     elif args.command == "generate":
         cmd_generate(args)
     elif args.command == "doctor":
