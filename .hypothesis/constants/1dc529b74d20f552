@@ -1,4 +1,0 @@
-# file: /home/eren/pictimp/acceptance/run_acceptance.py
-# hypothesis_version: 6.151.9
-
-['--cases', '--deterministic', '--format', '--mode', '--model', '--ordering', '--seed', '--strength', '--timeout-sec', '--tries', '--verbose', '-m', '0', '123', '2', '40', 'A) DOCTOR', 'B) GENERATE (auto)', 'C) GENERATE (keep)', 'D) DETERMINISM', 'Executable Binary', 'Source Module', 'Target mode to test', 'Timeout per command', 'Verbose output', '__main__', 'acceptance', 'arm64', 'auto', 'both', 'darwin', 'dist', 'doctor', 'examples', 'exe', 'fixtures', 'generate', 'incomplete_cases.csv', 'json', 'keep', 'lb', 'linux', 'metadata', 'model_path', 'n', 'pairwise_cli', 'sample.pict', 'source', 'store_true', 'test_cases', 'utf-8', 'verified', 'verify', 'w', 'windows']

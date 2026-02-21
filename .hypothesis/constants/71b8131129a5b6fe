@@ -1,4 +1,0 @@
-# file: C:\Users\ereno\Documents\GitHub\pictimp\pairwise_cli\preflight.py
-# hypothesis_version: 6.151.9
-
-[500, 'display_name', 'duplicate_param_name', 'duplicate_value', 'empty_param_name', 'empty_value', 'limit_max_params', 'model', 'model.parameters', 'model_malformed', 'model_missing', 'parameters', 'too_few_params', 'too_few_values', 'values', 'values_missing']

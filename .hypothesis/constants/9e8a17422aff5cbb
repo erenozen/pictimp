@@ -1,4 +1,0 @@
-# file: C:\Users\ereno\Documents\GitHub\pictimp\acceptance\expectations.py
-# hypothesis_version: 6.151.9
-
-['lb', 'metadata', "metadata missing 'n'", 'n', 'test_cases', 'verified']

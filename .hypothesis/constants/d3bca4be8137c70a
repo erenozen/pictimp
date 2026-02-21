@@ -1,4 +1,0 @@
-# file: /home/eren/pictimp/pairwise_cli/wizard.py
-# hypothesis_version: 6.151.9
-
-[500, 100000, '\nCancelled by user.', '\nGenerating...', '\nInput Error:', '\nModel Summary:', '\nOptions:', ' 1) Rename parameter', ' 2) Add value', ' 2) Edit a parameter', ' 4) Restart wizard', ' 5) Quit', ',', '-', '1', '2', '3', '4', '5', 'Choice (1-5): ', 'Choice: ', 'Invalid choice.', 'New name: ', 'New value: ', 'eof', 'generated', 'interrupt', 'n', 'pairwise_cases.txt', 'pairwise_model.txt', 'quit', 'restart', 'utf-8', 'w', 'y']
