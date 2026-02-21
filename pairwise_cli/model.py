@@ -38,7 +38,12 @@ class PairwiseModel:
             cleaned_values.append(v_clean)
             
         if len(cleaned_values) < 2:
-            raise ValueError(f"Parameter '{display_name}' must have at least 2 distinct values.")
+            raise ValueError(
+                f"Parameter '{display_name}' must have at least 2 distinct values. "
+                "Why do we need minimum of 2 values per parameter? A 1-value parameter adds no test-design power.\n\n"
+                "If a parameter has only one value, that value appears in every test case.\n\n"
+                "So for pairwise coverage, it doesn't help explore alternatives for that parameter."
+            )
 
         safe_name = make_safe_name(display_name, self._safe_name_cache)
         self._safe_name_cache.add(safe_name)
