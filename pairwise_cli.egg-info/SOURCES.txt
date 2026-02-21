@@ -8,6 +8,7 @@ pairwise_cli/generate.py
 pairwise_cli/model.py
 pairwise_cli/output.py
 pairwise_cli/pict.py
+pairwise_cli/preflight.py
 pairwise_cli/util.py
 pairwise_cli/verify.py
 pairwise_cli/wizard.py

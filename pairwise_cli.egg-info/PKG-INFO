@@ -98,3 +98,5 @@ This bundles the PICT binary and python files into a single standalone executabl
 
 Professor Verification Checklist: `docs/VERIFICATION_CHECKLIST.md`
 
+Robustness coverage includes adversarial wizard interactions (invalid state transitions, malformed input, and cancellation paths) to ensure no unhandled tracebacks during normal use.
+
