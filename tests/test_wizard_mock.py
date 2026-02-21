@@ -1,7 +1,7 @@
 """Tests for the interactive wizard using mock inputs."""
 import pytest
 from unittest.mock import patch
-from pairwise_cli.wizard import _gather_parameters, _generate_and_present
+from pairwise_cli.wizard import _gather_parameters, _generate_and_present, run_wizard
 from pairwise_cli.model import PairwiseModel
 from pairwise_cli.generate import OrderingMode
 
@@ -97,9 +97,7 @@ def test_wizard_generate_and_present_flow():
     with patch('pairwise_cli.wizard.prompt', side_effect=mock_prompt):
         with patch('pairwise_cli.wizard.generate_suite', return_value=MockRes()):
             with patch('builtins.print'):
-                with pytest.raises(SystemExit) as e:
-                    _generate_and_present(model)
-                assert e.value.code == 0
+                _generate_and_present(model)
 
 
 def test_wizard_no_verify_does_not_claim_minimum():
@@ -127,12 +125,58 @@ def test_wizard_no_verify_does_not_claim_minimum():
     with patch("pairwise_cli.wizard.prompt", side_effect=mock_prompt):
         with patch("pairwise_cli.wizard.generate_suite", return_value=MockRes()):
             with patch("builtins.print") as mock_print:
-                with pytest.raises(SystemExit) as e:
-                    _generate_and_present(model)
-                assert e.value.code == 0
+                _generate_and_present(model)
 
     printed = "\n".join(
         str(call.args[0]) for call in mock_print.call_args_list if call.args
     )
     assert "PROVABLY MINIMUM" not in printed
     assert "Result: COVERAGE NOT VERIFIED" in printed
+
+
+def test_wizard_save_outputs_txt_files(tmp_path, monkeypatch):
+    model = PairwiseModel()
+    model.add_parameter("A", ["1", "2"])
+    model.add_parameter("B", ["3", "4"])
+
+    inputs = ["2", "5", "y", "y"]
+
+    def mock_prompt(msg):
+        return inputs.pop(0)
+
+    class MockRes:
+        passed_verification = True
+        canonical_headers = ["A", "B"]
+        rows = [["1", "3"], ["1", "4"], ["2", "3"], ["2", "4"]]
+        ordering_mode = OrderingMode.AUTO
+        reordered_params = model.parameters
+        attempts = 5
+        seed = 123
+        lb = 4
+        n = 4
+        internal_pict_model_str = "A: 1, 2\nB: 3, 4\n"
+
+    with patch("pairwise_cli.wizard.prompt", side_effect=mock_prompt):
+        with patch("pairwise_cli.wizard.generate_suite", return_value=MockRes()):
+            with patch("builtins.print"):
+                monkeypatch.chdir(tmp_path)
+                _generate_and_present(model)
+
+    assert (tmp_path / "pairwise_model.txt").exists()
+    assert (tmp_path / "pairwise_cases.txt").exists()
+    assert (tmp_path / "pairwise_model.reordered.txt").exists()
+
+
+def test_run_wizard_repeat_flow_then_exit():
+    def populate_model(model):
+        model.add_parameter("A", ["1", "2"])
+        model.add_parameter("B", ["3", "4"])
+
+    with patch("pairwise_cli.wizard._gather_parameters", side_effect=populate_model) as gather_mock:
+        with patch("pairwise_cli.wizard._menu_loop", side_effect=["generated", "generated"]) as menu_mock:
+            with patch("pairwise_cli.wizard.prompt", side_effect=["y", "n"]):
+                with patch("builtins.print"):
+                    run_wizard()
+
+    assert gather_mock.call_count == 2
+    assert menu_mock.call_count == 2

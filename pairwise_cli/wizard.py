@@ -19,6 +19,9 @@ def run_wizard():
     print("Welcome to Pairwise-CLI!")
     print("This tool uses Microsoft PICT to generate pairwise (2-way) combinatorial test suites.")
     print("When strength=2, it can verify if the output achieves the theoretical minimum test count.")
+    print("You can exit anytime with Ctrl+C.")
+    print("Parameter: a configurable category being tested (example: Display Mode).")
+    print("Value: one option under a parameter (examples: full-graphics, text-only, limited-bandwith).")
     print("-" * 60)
     
     while True:
@@ -28,8 +31,16 @@ def run_wizard():
         if len(model.parameters) < 2:
             print("Need at least 2 parameters for pairwise generation. Exiting.")
             return
-            
-        _menu_loop(model)
+
+        action = _menu_loop(model)
+        if action == "restart":
+            continue
+        if action == "generated":
+            again = prompt("\nWould you like to try another set of values? (y/N): ").lower()
+            if again == "y":
+                continue
+            return
+        return
 
 def _gather_parameters(model: PairwiseModel):
     print("\nAdd parameters for your model.")
@@ -83,15 +94,15 @@ def _menu_loop(model: PairwiseModel):
         choice = prompt("Choice (1-5): ")
         if choice == '1':
             _generate_and_present(model)
-            break
+            return "generated"
         elif choice == '2':
             _edit_parameter(model)
         elif choice == '3':
             _delete_parameter(model)
         elif choice == '4':
-            return
+            return "restart"
         elif choice == '5':
-            sys.exit(0)
+            return "quit"
         else:
             print("Invalid choice.")
             
@@ -229,9 +240,9 @@ def _generate_and_present(model: PairwiseModel):
     
     s = prompt("\nSave model and cases to current directory? (y/N): ").lower()
     if s == 'y':
-        m_path = "pairwise_model.pict"
-        m_reordered_path = "pairwise_model.reordered.pict"
-        c_path = "pairwise_cases.csv"
+        m_path = "pairwise_model.txt"
+        m_reordered_path = "pairwise_model.reordered.txt"
+        c_path = "pairwise_cases.txt"
         
         with open(m_path, "w", encoding="utf-8") as f:
             for p in model.parameters:
@@ -246,5 +257,3 @@ def _generate_and_present(model: PairwiseModel):
                 
         with open(c_path, "w", encoding="utf-8") as f:
             f.write(format_csv(res.canonical_headers, res.rows))
-            
-    sys.exit(0)
