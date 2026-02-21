@@ -660,9 +660,15 @@ try {
     $EofErr = Join-Path $script:TempDir "eof_err.txt"
     $cmdLine = '"' + $script:ResolvedExePath + '" < NUL 1> "' + $EofOut + '" 2> "' + $EofErr + '"'
 
-Invoke-Capture -Name "Default invocation EOF smoke" -ExpectedExitCodes @(0,1,2,3,4,5) -Exe "cmd.exe" -Args @('/c', $cmdLine) | Out-Null    Assert-FileExists $EofOut "EOF smoke stdout file exists"
+    Invoke-Capture -Name "Default invocation EOF smoke" `
+        -ExpectedExitCodes @(0,1,2,3,4,5) `
+        -Exe "cmd.exe" `
+        -Args @('/c', $cmdLine) | Out-Null
+
+    Assert-FileExists $EofOut "EOF smoke stdout file exists"
     Assert-FileExists $EofErr "EOF smoke stderr file exists"
     Assert-NotContains $EofErr "Traceback (most recent call last)" "EOF smoke stderr has no traceback"
+
 
 } catch {
     Fail ("Unhandled exception in suite: " + $_.ToString())
