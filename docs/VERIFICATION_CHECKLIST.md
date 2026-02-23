@@ -1,4 +1,4 @@
-# Professor Verification Checklist (pairwise-cli)
+# Verification Checklist (pairwise-cli)
 
 Manual checklist to verify correctness, truthfulness, and robustness.
 
