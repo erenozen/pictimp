@@ -4,7 +4,7 @@ Cross-platform CLI tool for generating **pairwise (2-way) combinatorial test sui
 
 ## What It Does
 
-If you have a system with multiple parameters, each having multiple values, testing every combination is exponential. Pairwise testing guarantees that **every pair of parameter values** appears in at least one test case — this catches most real-world interaction bugs with far fewer tests.
+If you have a system with multiple parameters, each having multiple values, testing every combination is exponential. Pairwise testing guarantees that **every pair of parameter values** appears in at least one test case. This catches most real-world interaction bugs with far fewer tests.
 
 For example, 5 parameters with 3–4 values each would require **432 exhaustive test cases**. Pairwise testing covers the same interaction space in as few as **16**.
 
@@ -17,7 +17,7 @@ No Python or separate PICT installation is required to run the executables.
 
 ## Demo Video
 
-[In this video](https://drive.google.com/file/d/1GMQX0jZKarXRnUFS3gjtPqyHBvhkJ8lT/view?usp=drive_link), around **1:40**, the first run produces a valid pairwise suite with **17 test cases** (matching the textbook's result from *Software Testing and Analysis: Process, Principles and Techniques*, Pezze & Young, 2008, Wiley). Then the tool continues trying different randomized PICT runs and finds a **16-case** suite — the **provably minimum**.
+[In this video](https://drive.google.com/file/d/1GMQX0jZKarXRnUFS3gjtPqyHBvhkJ8lT/view?usp=drive_link), around **1:40**, the first run produces a valid pairwise suite with **17 test cases** (matching the textbook's result from *Software Testing and Analysis: Process, Principles and Techniques*, Pezze & Young, 2008, Wiley). Then the tool continues trying different randomized PICT runs and finds a **16-case** suite : the **provably minimum**.
 
 ## Quick Usage
 
@@ -33,6 +33,15 @@ No Python or separate PICT installation is required to run the executables.
 
 # Self-diagnostics
 ./pairwise-cli-linux-x64 doctor
+```
+
+## Building From Source
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+pytest -v                     # Run all tests
+bash scripts/build_exe.sh     # Build standalone executable
 ```
 
 ## Project Structure
@@ -61,14 +70,14 @@ examples/sample.pict     Example model file
 
 ## How Generation Works
 
-1. User provides a `.pict` model file (parameters + values)
+1. User provides a `.pict` model file (parameters and values)
 2. The app **parses and validates** the model
-3. Optionally **reorders parameters** by value count (descending) — this helps PICT produce smaller suites
-4. Computes a **mathematical lower bound** (LB) — the theoretical minimum suite size
+3. Optionally **reorders parameters** by value count (descending) : this helps PICT produce smaller suites
+4. Computes a **mathematical lower bound** (LB) : the theoretical minimum suite size
 5. Runs a **multi-seed loop**: executes PICT up to N times (default 50) with different random seeds, each producing a different test suite
 6. After each PICT run, **mathematically verifies** that all pairwise combinations are covered
 7. Tracks the **smallest verified suite** across all attempts
-8. If it finds a suite where N == LB, it **early-stops** — that's provably the minimum possible
+8. If it finds a suite where N == LB, it **early-stops** : that's provably the minimum possible
 9. Outputs the result as table, CSV, or JSON (with full metadata)
 
 **Exit codes:** 0 = success, 2 = validation error, 3 = PICT error, 4 = verification failed, 5 = timeout
@@ -91,7 +100,7 @@ Exhaustive testing: 4 x 4 x 3 x 3 x 3 = **432 test cases**. Pairwise testing cov
 
 ### Lower Bound (`bounds.py`)
 
-For every pair of parameters (i, j), compute `count_i x count_j`. The **maximum product** is the lower bound — you need at least that many rows to cover that one parameter pair alone.
+For every pair of parameters (i, j), compute `count_i x count_j`. The **maximum product** is the lower bound : you need at least that many rows to cover that one parameter pair alone.
 
 ```
 Language x Color        = 4 x 4 = 16  <-- maximum
@@ -143,29 +152,29 @@ Model [4,4,3,3,3]  -->  bounds.py: LB = 16 (theoretical floor)
 
 ## What I Implemented Beyond PICT
 
-PICT is a black-box binary that takes a model + seed and outputs one test suite. **Everything else is original work:**
+PICT is a binary that takes a model and seed then outputs one test suite. Everything else is implemented by me.
 
 | What | File | Why PICT doesn't do this |
 |------|------|--------------------------|
 | Pairwise coverage verification | `verify.py` | PICT generates suites but never proves they're correct. Builds a coverage matrix and mathematically verifies every pair is present. |
-| Lower bound computation | `bounds.py` | PICT has no concept of "minimum possible." Computes LB = max(vi x vj) — the theoretical floor. |
+| Lower bound computation | `bounds.py` | PICT has no concept of "minimum possible." Computes LB = max(vi x vj) : the theoretical floor. |
 | Multi-seed optimization loop | `generate.py` | PICT runs once with one seed. This runs it up to 5000 times, tracking the smallest verified suite, with early-stop when LB is hit. |
-| Deterministic tie-breaking | `generate.py` | When two seeds produce the same N, `--deterministic` guarantees the lower seed wins — reproducible builds. |
+| Deterministic tie-breaking | `generate.py` | When two seeds produce the same N, `--deterministic` guarantees the lower seed wins : reproducible builds. |
 | Parameter reordering (auto mode) | `model.py` | Sorting parameters by value count (descending) before feeding to PICT produces smaller suites. |
 | Complete data model with validation | `model.py` | Safe name generation, case-insensitive duplicate detection, special character validation, serialization/deserialization. |
 | Pre-flight validation system | `preflight.py` | Non-throwing validation that collects all issues at once. Used by the wizard for user-friendly error reporting. |
-| Full CLI with 6 subcommands | `cli.py` | generate, verify, doctor, wizard, licenses, version — with structured exit codes (0/2/3/4/5). |
-| Interactive wizard mode | `wizard.py` | Build models interactively, edit/delete parameters, choose settings, save outputs — with full error recovery. |
+| Full CLI with 6 subcommands | `cli.py` | generate, verify, doctor, wizard, licenses, version : with structured exit codes (0/2/3/4/5). |
+| Interactive wizard mode | `wizard.py` | Build models interactively, edit/delete parameters, choose settings, save outputs : with full error recovery. |
 | Output formatting (table/CSV/JSON) | `output.py` | JSON includes a metadata block with lb, n, seed, verified, ordering_mode. PICT only outputs raw TSV. |
 | Cross-platform binary management | `pict.py` | Bundled vendor binaries, cache extraction with 4-level fallback, PyInstaller bundle support, platform detection. |
 | Two-tier timeout system | `generate.py` | Per-PICT-execution timeout and total generation budget. PICT has no timeout concept. |
 | 82 automated tests | `tests/` | Unit, integration, acceptance (source+exe), hypothesis fuzzing, wizard adversarial tests. |
 | CI/CD pipeline | `.github/workflows/` | GitHub Actions building for Windows and Linux, running tests, uploading artifacts. |
-| PyInstaller packaging | `scripts/` | Build scripts that bundle Python + PICT into a single standalone executable. |
+| PyInstaller packaging | `scripts/` | Build scripts that bundle Python and PICT into a single standalone executable. |
 
 ## Test Suite
 
-**82 tests total** (62 unit/integration + 20 acceptance).
+**82 tests total** (62 unit/integration and 20 acceptance).
 
 ### Unit & Integration Tests (`tests/`)
 
@@ -186,7 +195,7 @@ PICT is a black-box binary that takes a model + seed and outputs one test suite.
 
 ### Acceptance Tests (`tests/acceptance/`)
 
-Every acceptance test runs **twice** — once against the Python source and once against the compiled executable.
+Every acceptance test runs **twice** : once against the Python source and once against the compiled executable.
 
 | File | Tests | What it tests |
 |------|-------|--------------|
@@ -194,19 +203,8 @@ Every acceptance test runs **twice** — once against the Python source and once
 | `test_acceptance_generate.py` | 4 | Generate with auto and keep ordering, N >= 16, verified |
 | `test_acceptance_determinism.py` | 2 | Two identical runs produce identical output |
 | `test_acceptance_verify.py` | 2 | Incomplete cases correctly fail verification |
-| `test_acceptance_abuse.py` | 10 | Error paths: missing model, invalid JSON, empty CSV, missing columns, non-UTF8 — clean errors, no tracebacks |
-
-## Building From Source
-
-```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-pytest -v                     # Run all tests
-bash scripts/build_exe.sh     # Build standalone executable
-```
+| `test_acceptance_abuse.py` | 10 | Error paths: missing model, invalid JSON, empty CSV, missing columns, non-UTF8 : clean errors, no tracebacks |
 
 ## Verification Checklist
 
 See `docs/VERIFICATION_CHECKLIST.md`
-
-Robustness coverage includes adversarial wizard interactions (invalid state transitions, malformed input, and cancellation paths) to ensure no unhandled tracebacks during normal use.
