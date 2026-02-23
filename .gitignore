@@ -35,7 +35,7 @@ test_fuzz_out.txt
 tiny_timeout_*
 strace.out
 strace_python.txt
-dist/*.txt
+dist/
 
 # Local scratch files
 empty.pict
