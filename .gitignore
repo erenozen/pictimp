@@ -41,3 +41,5 @@ dist/*.txt
 empty.pict
 test_import.py
 test_hang.py
+
+docs/diagrams
