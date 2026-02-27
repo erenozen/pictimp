@@ -1,6 +1,6 @@
 # PICT Improved
 
-Cross-platform CLI tool for generating **pairwise (2-way) combinatorial test suites** using Microsoft PICT.
+Cross-platform CLI tool for generating **pairwise (2-way) combinatorial test suites**.
 
 ## What It Does
 
