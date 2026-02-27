@@ -13,7 +13,7 @@ For example, 5 parameters with 3–4 values each would require **432 exhaustive 
 - **Windows:** `pairwise-cli-win-x64.exe`
 - **Linux:** `pairwise-cli-linux-x64`
 
-No Python or separate PICT installation is required to run the executables.
+No Python or separate installation is required to run the executables.
 
 ## Demo Video
 
